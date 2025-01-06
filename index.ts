@@ -152,6 +152,7 @@ const screenshots = new Map<string, string>();
 const requests: Map<
   string,
   {
+    url: string;
     method: string;
     headers: Record<string, string>;
     resourceType: string;
@@ -183,16 +184,34 @@ async function ensureBrowser() {
     });
 
     page.on("request", (request) => {
-      if (requests.has(request.url())) {
-        requests.get(request.url()).push({
+      if (requests.has(page.url())) {
+        requests.get(page.url()).push({
+          url: request.url(),
+          resourceType: request.resourceType(),
+          method: request.method(),
+          headers: request.headers(),
+          postData: request.postData(),
+        });
+        // server.sendLoggingMessage({
+        //   level: "info",
+        //   data: JSON.stringify({
+        //     resourceType: request.resourceType(),
+        //     method: request.method(),
+        //     headers: request.headers(),
+        //     postData: request.postData(),
+        //   }),
+        // });
+        console.error("request", {
+          url: request.url(),
           resourceType: request.resourceType(),
           method: request.method(),
           headers: request.headers(),
           postData: request.postData(),
         });
       } else {
-        requests.set(request.url(), [
+        requests.set(page.url(), [
           {
+            url: request.url(),
             resourceType: request.resourceType(),
             method: request.method(),
             headers: request.headers(),
@@ -450,6 +469,13 @@ async function handleToolCall(
       };
 
     case "get_page_requests": {
+      console.error(
+        "get_page_requests",
+        "arg url",
+        args.url,
+        "all_requests",
+        requests
+      );
       const requestData = requests.get(args.url);
       if (!requestData) {
         return {
