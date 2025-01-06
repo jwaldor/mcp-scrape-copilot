@@ -148,6 +148,7 @@ async function ensureBrowser() {
     );
     const pages = await browser.pages();
     page = pages[0];
+    page.setRequestInterception(true);
 
     page.on("console", (msg) => {
       const logEntry = `[${msg.type()}] ${msg.text()}`;
