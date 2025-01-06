@@ -178,6 +178,9 @@ async function ensureBrowser() {
       }
       request.continue();
     });
+    page.on("load", () => {
+      urlHistory.push(page.url());
+    });
   }
   return page!;
 }
