@@ -126,7 +126,7 @@ let browser: Browser | undefined;
 let page: Page | undefined;
 const consoleLogs: string[] = [];
 const screenshots = new Map<string, string>();
-export const requests: Map<
+const requests: Map<
   string,
   {
     method: string;
@@ -135,7 +135,7 @@ export const requests: Map<
     postData: any;
   }[]
 > = new Map(); // collects all results
-export const urlHistory: Array<string> = [];
+const urlHistory: Array<string> = [];
 async function ensureBrowser() {
   if (!browser) {
     const npx_args = { headless: false };
@@ -453,11 +453,11 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       mimeType: "image/png",
       name: `Screenshot: ${name}`,
     })),
-    ...urlHistory.map((url) => ({
-      uri: `url://${url}`,
+    {
+      uri: `history://urls`,
       mimeType: "text/plain",
-      name: `Request: ${url}`,
-    })),
+      name: `History: URLs`,
+    },
     ...Array.from(requests.keys()).map((url) => ({
       uri: `request://${url}`,
       mimeType: "text/plain",
@@ -495,6 +495,31 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         ],
       };
     }
+  }
+
+  if (uri.startsWith("history://urls")) {
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "text/plain",
+          text: urlHistory.reverse().join("\n"),
+        },
+      ],
+    };
+  }
+
+  if (uri.startsWith("request://")) {
+    const url = uri.split("://")[1];
+    return {
+      contents: [
+        {
+          uri,
+          mimeType: "text/plain",
+          text: JSON.stringify(requests.get(url), null, 2),
+        },
+      ],
+    };
   }
 
   throw new Error(`Resource not found: ${uri}`);
