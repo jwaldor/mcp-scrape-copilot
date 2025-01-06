@@ -453,6 +453,16 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       mimeType: "image/png",
       name: `Screenshot: ${name}`,
     })),
+    ...urlHistory.map((url) => ({
+      uri: `url://${url}`,
+      mimeType: "text/plain",
+      name: `Request: ${url}`,
+    })),
+    ...Array.from(requests.keys()).map((url) => ({
+      uri: `request://${url}`,
+      mimeType: "text/plain",
+      name: `Requests for: ${url}`,
+    })),
   ],
 }));
 
