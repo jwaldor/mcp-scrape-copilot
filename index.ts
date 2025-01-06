@@ -4,16 +4,15 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
-  ListResourcesRequestSchema,
   ListToolsRequestSchema,
-  ReadResourceRequestSchema,
   CallToolResult,
-  TextContent,
-  ImageContent,
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer, { Browser, Page } from "puppeteer";
 import { makeRequest } from "./utilities.js";
+import * as use from "@tensorflow-models/universal-sentence-encoder";
+import "@tensorflow/tfjs-backend-webgl";
+import * as tf from "@tensorflow/tfjs";
 // Define the tools once to avoid repetition
 const TOOLS: Tool[] = [
   {
@@ -94,6 +93,7 @@ const requests: Map<
   }[]
 > = new Map(); // collects all results
 const urlHistory: Array<string> = [];
+
 async function ensureBrowser() {
   if (!browser) {
     const npx_args = { headless: false };
@@ -162,6 +162,16 @@ async function ensureBrowser() {
   return page!;
 }
 
+let model: use.UniversalSentenceEncoder | undefined;
+async function ensureModel() {
+  if (!model) {
+    await tf.setBackend("cpu");
+    await tf.ready();
+    const model = await use.load();
+  }
+  return model;
+}
+
 declare global {
   interface Window {
     mcpHelper: {
@@ -176,7 +186,7 @@ async function handleToolCall(
   args: any
 ): Promise<CallToolResult> {
   const page = await ensureBrowser();
-
+  const model = await ensureModel();
   switch (name) {
     case "puppeteer_navigate":
       await page.goto(args.url);
