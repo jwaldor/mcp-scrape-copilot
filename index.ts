@@ -168,6 +168,7 @@ async function ensureModel() {
     await tf.setBackend("cpu");
     await tf.ready();
     const model = await use.load();
+    return model;
   }
   return model;
 }
