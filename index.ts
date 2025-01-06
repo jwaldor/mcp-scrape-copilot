@@ -119,6 +119,29 @@ const TOOLS: Tool[] = [
       required: ["script"],
     },
   },
+  {
+    name: "page_history",
+    description: "Get the history of visited URLs, most recent urls first",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_page_requests",
+    description: "Get all HTTP requests made for a specific URL",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The URL to get requests for",
+        },
+      },
+      required: ["url"],
+    },
+  },
 ];
 
 // Global state
@@ -415,6 +438,41 @@ async function handleToolCall(
         };
       }
 
+    case "page_history":
+      return {
+        content: [
+          {
+            type: "text",
+            text: urlHistory.reverse().join("\n"),
+          },
+        ],
+        isError: false,
+      };
+
+    case "get_page_requests": {
+      const requestData = requests.get(args.url);
+      if (!requestData) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No requests found for URL: ${args.url}`,
+            },
+          ],
+          isError: false,
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(requestData, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    }
+
     default:
       return {
         content: [
@@ -454,16 +512,6 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       mimeType: "image/png",
       name: `Screenshot: ${name}`,
     })),
-    {
-      uri: `history://urls`,
-      mimeType: "text/plain",
-      name: `History: URLs`,
-    },
-    ...Array.from(requests.keys()).map((url) => ({
-      uri: `request://${url}`,
-      mimeType: "text/plain",
-      name: `Requests for: ${url}`,
-    })),
   ],
 }));
 
@@ -496,31 +544,6 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         ],
       };
     }
-  }
-
-  if (uri.startsWith("history://urls")) {
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: "text/plain",
-          text: urlHistory.reverse().join("\n"),
-        },
-      ],
-    };
-  }
-
-  if (uri.startsWith("request://")) {
-    const url = uri.split("://")[1];
-    return {
-      contents: [
-        {
-          uri,
-          mimeType: "text/plain",
-          text: JSON.stringify(requests.get(url), null, 2),
-        },
-      ],
-    };
   }
 
   throw new Error(`Resource not found: ${uri}`);
