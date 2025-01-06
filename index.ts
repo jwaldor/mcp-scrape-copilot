@@ -9,7 +9,11 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer, { Browser, Page } from "puppeteer";
-import { getEmbedding, makeRequest } from "./utilities.js";
+import {
+  getEmbedding,
+  makeRequest,
+  semanticSearchRequests,
+} from "./utilities.js";
 import * as use from "@tensorflow-models/universal-sentence-encoder";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
@@ -79,7 +83,7 @@ const TOOLS: Tool[] = [
   {
     name: "semantic_search_requests",
     description:
-      "Semantically search for requests for a given page URL. Returns the top 10 results.",
+      "Semantically search for requests that occurred within a page URL. Returns the top 10 results.",
     inputSchema: {
       type: "object",
       properties: {
@@ -90,7 +94,7 @@ const TOOLS: Tool[] = [
         },
         page_url: {
           type: "string",
-          description: "The page whose requests you want to search",
+          description: "The page within which to search for requests",
         },
       },
       required: ["query", "page_url"],
@@ -276,6 +280,20 @@ async function handleToolCall(
       );
       return {
         content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+        isError: false,
+      };
+    }
+
+    case "semantic_search_requests": {
+      const searchResults = await semanticSearchRequests(
+        args.query,
+        requests.get(args.page_url),
+        model
+      );
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(searchResults, null, 2) },
+        ],
         isError: false,
       };
     }
