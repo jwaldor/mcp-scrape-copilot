@@ -78,7 +78,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: "semantic_search_requests",
-    description: "Semantically search for requests for a given page URl",
+    description:
+      "Semantically search for requests for a given page URL. Returns the top 10 results.",
     inputSchema: {
       type: "object",
       properties: {

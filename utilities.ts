@@ -57,3 +57,39 @@ async function testGetEmbedding() {
 }
 
 testGetEmbedding();
+
+export async function semanticSearchRequests(
+  query: string,
+  requests: Array<{
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    resourceType: string;
+    postData: any;
+    embedding: number[];
+  }>,
+  model: use.UniversalSentenceEncoder
+): Promise<Array<any>> {
+  // Get embedding for the query
+  const queryEmbedding = await getEmbedding(query, model);
+
+  // Calculate cosine similarity scores for all requests
+  const scoredRequests = requests.map((request) => {
+    // Compute cosine similarity between query and request embeddings
+    const similarity = cosineSimilarity(queryEmbedding, request.embedding);
+    return { ...request, similarity };
+  });
+
+  // Sort by similarity score (highest first) and take top 10
+  return scoredRequests
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 10);
+}
+
+// Helper function to compute cosine similarity between two vectors
+function cosineSimilarity(a: number[], b: number[]): number {
+  const dotProduct = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const magnitudeA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const magnitudeB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  return dotProduct / (magnitudeA * magnitudeB);
+}
