@@ -17,6 +17,7 @@ import {
 import * as use from "@tensorflow-models/universal-sentence-encoder";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
+import { RequestRecord } from "./types.js";
 // Define the tools once to avoid repetition
 const TOOLS: Tool[] = [
   {
@@ -39,21 +40,21 @@ const TOOLS: Tool[] = [
       required: [],
     },
   },
-  {
-    name: "get_page_requests",
-    description:
-      "Get all of the HTTP requests made for a specific URL, the most recent requests first",
-    inputSchema: {
-      type: "object",
-      properties: {
-        url: {
-          type: "string",
-          description: "The URL to get requests for",
-        },
-      },
-      required: ["url"],
-    },
-  },
+  // {
+  //   name: "get_page_requests",
+  //   description:
+  //     "Get all of the HTTP requests made for a specific URL, the most recent requests first",
+  //   inputSchema: {
+  //     type: "object",
+  //     properties: {
+  //       url: {
+  //         type: "string",
+  //         description: "The URL to get requests for",
+  //       },
+  //     },
+  //     required: ["url"],
+  //   },
+  // },
   {
     name: "make_http_request",
     description: "Make an HTTP request with curl",
@@ -106,17 +107,7 @@ const TOOLS: Tool[] = [
 let browser: Browser | undefined;
 let page: Page | undefined;
 const consoleLogs: string[] = [];
-const requests: Map<
-  string,
-  {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    resourceType: string;
-    postData: any;
-    embedding: number[];
-  }[]
-> = new Map(); // collects all results
+const requests: Map<string, RequestRecord[]> = new Map(); // collects all results
 const urlHistory: Array<string> = [];
 
 async function ensureBrowser() {
@@ -290,9 +281,12 @@ async function handleToolCall(
         requests.get(args.page_url),
         model
       );
+      const withoutEmbedding = searchResults.map(
+        ({ embedding, similarity, ...rest }) => rest
+      );
       return {
         content: [
-          { type: "text", text: JSON.stringify(searchResults, null, 2) },
+          { type: "text", text: JSON.stringify(withoutEmbedding, null, 2) },
         ],
         isError: false,
       };

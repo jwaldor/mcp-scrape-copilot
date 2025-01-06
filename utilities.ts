@@ -1,6 +1,7 @@
 import * as use from "@tensorflow-models/universal-sentence-encoder";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
+import { RequestRecord } from "./types.js";
 
 export async function makeRequest(
   url: string,
@@ -60,16 +61,9 @@ testGetEmbedding();
 
 export async function semanticSearchRequests(
   query: string,
-  requests: Array<{
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    resourceType: string;
-    postData: any;
-    embedding: number[];
-  }>,
+  requests: Array<RequestRecord>,
   model: use.UniversalSentenceEncoder
-): Promise<Array<any>> {
+): Promise<Array<RequestRecord & { similarity: number }>> {
   // Get embedding for the query
   const queryEmbedding = await getEmbedding(query, model);
 
