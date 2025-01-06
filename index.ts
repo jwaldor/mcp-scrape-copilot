@@ -13,7 +13,7 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer, { Browser, Page } from "puppeteer";
-
+import { makeRequest } from "./utilities.js";
 // Define the tools once to avoid repetition
 const TOOLS: Tool[] = [
   {
@@ -49,6 +49,32 @@ const TOOLS: Tool[] = [
         },
       },
       required: ["url"],
+    },
+  },
+  {
+    name: "make_http_request",
+    description: "Make an HTTP request with curl",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          description: "Type of the request. GET, POST, PUT, DELETE",
+        },
+        url: {
+          type: "string",
+          description: "Url to make the request to",
+        },
+        headers: {
+          type: "object",
+          description: "Headers to include in the request",
+        },
+        body: {
+          type: "object",
+          description: "Body to include in the request",
+        },
+      },
+      required: ["type", "url", "headers", "body"],
     },
   },
 ];
@@ -202,6 +228,19 @@ async function handleToolCall(
             text: JSON.stringify(requestData, null, 2),
           },
         ],
+        isError: false,
+      };
+    }
+
+    case "make_http_request": {
+      const response = await makeRequest(
+        args.url,
+        args.type,
+        args.headers,
+        args.body
+      );
+      return {
+        content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
         isError: false,
       };
     }
