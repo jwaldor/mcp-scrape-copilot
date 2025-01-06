@@ -47,17 +47,17 @@ export async function getEmbedding(
   return embeddingArray[0];
 }
 
-async function testGetEmbedding() {
-  console.log("Loading model...");
-  await tf.setBackend("cpu");
-  await tf.ready();
-  const model = await use.load();
-  console.log("Model loaded");
-  const embedding = await getEmbedding("Hello, world!", model);
-  console.log(embedding);
-}
+// async function testGetEmbedding() {
+//   console.log("Loading model...");
+//   await tf.setBackend("cpu");
+//   await tf.ready();
+//   const model = await use.load();
+//   console.log("Model loaded");
+//   const embedding = await getEmbedding("Hello, world!", model);
+//   console.log(embedding);
+// }
 
-testGetEmbedding();
+// testGetEmbedding();
 
 export async function semanticSearchRequests(
   query: string,
