@@ -112,7 +112,7 @@ const urlHistory: Array<string> = [];
 
 async function ensureBrowser() {
   if (!browser) {
-    const model = await ensureModel();
+    // await ensureModel();
     const npx_args = { headless: false };
     const docker_args = {
       headless: true,
@@ -134,49 +134,49 @@ async function ensureBrowser() {
       });
     });
 
-    page.on("request", async (request) => {
-      if (requests.has(page.url())) {
-        requests.get(page.url()).unshift({
-          url: request.url(),
-          resourceType: request.resourceType(),
-          method: request.method(),
-          headers: request.headers(),
-          postData: request.postData(),
-          embedding: await getEmbedding(request.url(), model),
-        });
-        // server.sendLoggingMessage({
-        //   level: "info",
-        //   data: JSON.stringify({
-        //     resourceType: request.resourceType(),
-        //     method: request.method(),
-        //     headers: request.headers(),
-        //     postData: request.postData(),
-        //   }),
-        // });
-        console.error("request", {
-          url: request.url(),
-          resourceType: request.resourceType(),
-          method: request.method(),
-          headers: request.headers(),
-          postData: request.postData(),
-        });
-      } else {
-        requests.set(page.url(), [
-          {
-            url: request.url(),
-            resourceType: request.resourceType(),
-            method: request.method(),
-            headers: request.headers(),
-            postData: request.postData(),
-            embedding: await getEmbedding(request.url(), model),
-          },
-        ]);
-      }
-      request.continue();
-    });
-    page.on("load", () => {
-      urlHistory.push(page.url());
-    });
+    // page.on("request", async (request) => {
+    //   if (requests.has(page.url())) {
+    //     requests.get(page.url()).unshift({
+    //       url: request.url(),
+    //       resourceType: request.resourceType(),
+    //       method: request.method(),
+    //       headers: request.headers(),
+    //       postData: request.postData(),
+    //       embedding: await getEmbedding(request.url(), model),
+    //     });
+    //     // server.sendLoggingMessage({
+    //     //   level: "info",
+    //     //   data: JSON.stringify({
+    //     //     resourceType: request.resourceType(),
+    //     //     method: request.method(),
+    //     //     headers: request.headers(),
+    //     //     postData: request.postData(),
+    //     //   }),
+    //     // });
+    //     console.error("request", {
+    //       url: request.url(),
+    //       resourceType: request.resourceType(),
+    //       method: request.method(),
+    //       headers: request.headers(),
+    //       postData: request.postData(),
+    //     });
+    //   } else {
+    //     requests.set(page.url(), [
+    //       {
+    //         url: request.url(),
+    //         resourceType: request.resourceType(),
+    //         method: request.method(),
+    //         headers: request.headers(),
+    //         postData: request.postData(),
+    //         embedding: await getEmbedding(request.url(), model),
+    //       },
+    //     ]);
+    //   }
+    //   request.continue();
+    // });
+    // page.on("load", () => {
+    //   urlHistory.push(page.url());
+    // });
   }
   return page!;
 }
@@ -186,7 +186,7 @@ async function ensureModel() {
   if (!model) {
     await tf.setBackend("cpu");
     await tf.ready();
-    const model = await use.load();
+    model = await use.load();
     return model;
   }
   return model;
@@ -206,7 +206,7 @@ async function handleToolCall(
   args: any
 ): Promise<CallToolResult> {
   const page = await ensureBrowser();
-  const model = await ensureModel();
+  // const model = await ensureModel();
   switch (name) {
     case "puppeteer_navigate":
       await page.goto(args.url);
