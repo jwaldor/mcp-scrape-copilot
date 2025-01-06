@@ -9,7 +9,7 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer, { Browser, Page } from "puppeteer";
-import { makeRequest } from "./utilities.js";
+import { getEmbedding, makeRequest } from "./utilities.js";
 import * as use from "@tensorflow-models/universal-sentence-encoder";
 import "@tensorflow/tfjs-backend-webgl";
 import * as tf from "@tensorflow/tfjs";
@@ -90,12 +90,14 @@ const requests: Map<
     headers: Record<string, string>;
     resourceType: string;
     postData: any;
+    embedding: number[];
   }[]
 > = new Map(); // collects all results
 const urlHistory: Array<string> = [];
 
 async function ensureBrowser() {
   if (!browser) {
+    const model = await ensureModel();
     const npx_args = { headless: false };
     const docker_args = {
       headless: true,
@@ -117,7 +119,7 @@ async function ensureBrowser() {
       });
     });
 
-    page.on("request", (request) => {
+    page.on("request", async (request) => {
       if (requests.has(page.url())) {
         requests.get(page.url()).unshift({
           url: request.url(),
@@ -125,6 +127,7 @@ async function ensureBrowser() {
           method: request.method(),
           headers: request.headers(),
           postData: request.postData(),
+          embedding: await getEmbedding(request.url(), model),
         });
         // server.sendLoggingMessage({
         //   level: "info",
@@ -150,6 +153,7 @@ async function ensureBrowser() {
             method: request.method(),
             headers: request.headers(),
             postData: request.postData(),
+            embedding: await getEmbedding(request.url(), model),
           },
         ]);
       }
