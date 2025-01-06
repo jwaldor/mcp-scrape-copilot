@@ -76,6 +76,25 @@ const TOOLS: Tool[] = [
       required: ["type", "url", "headers", "body"],
     },
   },
+  {
+    name: "semantic_search_requests",
+    description: "Semantically search for requests for a given page URl",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Your search request. Make this specific and detailed to get the best results",
+        },
+        page_url: {
+          type: "string",
+          description: "The page whose requests you want to search",
+        },
+      },
+      required: ["query", "page_url"],
+    },
+  },
 ];
 
 // Global state
