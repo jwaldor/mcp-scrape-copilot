@@ -34,9 +34,18 @@ const TOOLS: Tool[] = [
       type: "object",
       properties: {
         name: { type: "string", description: "Name for the screenshot" },
-        selector: { type: "string", description: "CSS selector for element to screenshot" },
-        width: { type: "number", description: "Width in pixels (default: 800)" },
-        height: { type: "number", description: "Height in pixels (default: 600)" },
+        selector: {
+          type: "string",
+          description: "CSS selector for element to screenshot",
+        },
+        width: {
+          type: "number",
+          description: "Width in pixels (default: 800)",
+        },
+        height: {
+          type: "number",
+          description: "Height in pixels (default: 600)",
+        },
       },
       required: ["name"],
     },
@@ -47,7 +56,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        selector: { type: "string", description: "CSS selector for element to click" },
+        selector: {
+          type: "string",
+          description: "CSS selector for element to click",
+        },
       },
       required: ["selector"],
     },
@@ -58,7 +70,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        selector: { type: "string", description: "CSS selector for input field" },
+        selector: {
+          type: "string",
+          description: "CSS selector for input field",
+        },
         value: { type: "string", description: "Value to fill" },
       },
       required: ["selector", "value"],
@@ -70,7 +85,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        selector: { type: "string", description: "CSS selector for element to select" },
+        selector: {
+          type: "string",
+          description: "CSS selector for element to select",
+        },
         value: { type: "string", description: "Value to select" },
       },
       required: ["selector", "value"],
@@ -82,7 +100,10 @@ const TOOLS: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        selector: { type: "string", description: "CSS selector for element to hover" },
+        selector: {
+          type: "string",
+          description: "CSS selector for element to hover",
+        },
       },
       required: ["selector"],
     },
@@ -98,6 +119,30 @@ const TOOLS: Tool[] = [
       required: ["script"],
     },
   },
+  {
+    name: "page_history",
+    description: "Get the history of visited URLs, most recent urls first",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_page_requests",
+    description:
+      "Get all of the HTTP requests made for a specific URL, the most recent requests first",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The URL to get requests for",
+        },
+      },
+      required: ["url"],
+    },
+  },
 ];
 
 // Global state
@@ -105,14 +150,30 @@ let browser: Browser | undefined;
 let page: Page | undefined;
 const consoleLogs: string[] = [];
 const screenshots = new Map<string, string>();
-
+const requests: Map<
+  string,
+  {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    resourceType: string;
+    postData: any;
+  }[]
+> = new Map(); // collects all results
+const urlHistory: Array<string> = [];
 async function ensureBrowser() {
   if (!browser) {
-    const npx_args = { headless: false }
-    const docker_args = { headless: true, args: ["--no-sandbox", "--single-process", "--no-zygote"] }
-    browser = await puppeteer.launch(process.env.DOCKER_CONTAINER ? docker_args : npx_args);
+    const npx_args = { headless: false };
+    const docker_args = {
+      headless: true,
+      args: ["--no-sandbox", "--single-process", "--no-zygote"],
+    };
+    browser = await puppeteer.launch(
+      process.env.DOCKER_CONTAINER ? docker_args : npx_args
+    );
     const pages = await browser.pages();
     page = pages[0];
+    page.setRequestInterception(true);
 
     page.on("console", (msg) => {
       const logEntry = `[${msg.type()}] ${msg.text()}`;
@@ -122,6 +183,48 @@ async function ensureBrowser() {
         params: { uri: "console://logs" },
       });
     });
+
+    page.on("request", (request) => {
+      if (requests.has(page.url())) {
+        requests.get(page.url()).unshift({
+          url: request.url(),
+          resourceType: request.resourceType(),
+          method: request.method(),
+          headers: request.headers(),
+          postData: request.postData(),
+        });
+        // server.sendLoggingMessage({
+        //   level: "info",
+        //   data: JSON.stringify({
+        //     resourceType: request.resourceType(),
+        //     method: request.method(),
+        //     headers: request.headers(),
+        //     postData: request.postData(),
+        //   }),
+        // });
+        console.error("request", {
+          url: request.url(),
+          resourceType: request.resourceType(),
+          method: request.method(),
+          headers: request.headers(),
+          postData: request.postData(),
+        });
+      } else {
+        requests.set(page.url(), [
+          {
+            url: request.url(),
+            resourceType: request.resourceType(),
+            method: request.method(),
+            headers: request.headers(),
+            postData: request.postData(),
+          },
+        ]);
+      }
+      request.continue();
+    });
+    page.on("load", () => {
+      urlHistory.push(page.url());
+    });
   }
   return page!;
 }
@@ -129,23 +232,28 @@ async function ensureBrowser() {
 declare global {
   interface Window {
     mcpHelper: {
-      logs: string[],
-      originalConsole: Partial<typeof console>,
-    }
+      logs: string[];
+      originalConsole: Partial<typeof console>;
+    };
   }
 }
 
-async function handleToolCall(name: string, args: any): Promise<CallToolResult> {
+async function handleToolCall(
+  name: string,
+  args: any
+): Promise<CallToolResult> {
   const page = await ensureBrowser();
 
   switch (name) {
     case "puppeteer_navigate":
       await page.goto(args.url);
       return {
-        content: [{
-          type: "text",
-          text: `Navigated to ${args.url}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Navigated to ${args.url}`,
+          },
+        ],
         isError: false,
       };
 
@@ -154,16 +262,20 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
       const height = args.height ?? 600;
       await page.setViewport({ width, height });
 
-      const screenshot = await (args.selector ?
-        (await page.$(args.selector))?.screenshot({ encoding: "base64" }) :
-        page.screenshot({ encoding: "base64", fullPage: false }));
+      const screenshot = await (args.selector
+        ? (await page.$(args.selector))?.screenshot({ encoding: "base64" })
+        : page.screenshot({ encoding: "base64", fullPage: false }));
 
       if (!screenshot) {
         return {
-          content: [{
-            type: "text",
-            text: args.selector ? `Element not found: ${args.selector}` : "Screenshot failed",
-          }],
+          content: [
+            {
+              type: "text",
+              text: args.selector
+                ? `Element not found: ${args.selector}`
+                : "Screenshot failed",
+            },
+          ],
           isError: true,
         };
       }
@@ -193,18 +305,24 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
       try {
         await page.click(args.selector);
         return {
-          content: [{
-            type: "text",
-            text: `Clicked: ${args.selector}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Clicked: ${args.selector}`,
+            },
+          ],
           isError: false,
         };
       } catch (error) {
         return {
-          content: [{
-            type: "text",
-            text: `Failed to click ${args.selector}: ${(error as Error).message}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Failed to click ${args.selector}: ${
+                (error as Error).message
+              }`,
+            },
+          ],
           isError: true,
         };
       }
@@ -214,18 +332,24 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
         await page.waitForSelector(args.selector);
         await page.type(args.selector, args.value);
         return {
-          content: [{
-            type: "text",
-            text: `Filled ${args.selector} with: ${args.value}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Filled ${args.selector} with: ${args.value}`,
+            },
+          ],
           isError: false,
         };
       } catch (error) {
         return {
-          content: [{
-            type: "text",
-            text: `Failed to fill ${args.selector}: ${(error as Error).message}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Failed to fill ${args.selector}: ${
+                (error as Error).message
+              }`,
+            },
+          ],
           isError: true,
         };
       }
@@ -235,18 +359,24 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
         await page.waitForSelector(args.selector);
         await page.select(args.selector, args.value);
         return {
-          content: [{
-            type: "text",
-            text: `Selected ${args.selector} with: ${args.value}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Selected ${args.selector} with: ${args.value}`,
+            },
+          ],
           isError: false,
         };
       } catch (error) {
         return {
-          content: [{
-            type: "text",
-            text: `Failed to select ${args.selector}: ${(error as Error).message}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Failed to select ${args.selector}: ${
+                (error as Error).message
+              }`,
+            },
+          ],
           isError: true,
         };
       }
@@ -256,18 +386,24 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
         await page.waitForSelector(args.selector);
         await page.hover(args.selector);
         return {
-          content: [{
-            type: "text",
-            text: `Hovered ${args.selector}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Hovered ${args.selector}`,
+            },
+          ],
           isError: false,
         };
       } catch (error) {
         return {
-          content: [{
-            type: "text",
-            text: `Failed to hover ${args.selector}: ${(error as Error).message}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Failed to hover ${args.selector}: ${
+                (error as Error).message
+              }`,
+            },
+          ],
           isError: true,
         };
       }
@@ -280,20 +416,20 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
             originalConsole: { ...console },
           };
 
-          ['log', 'info', 'warn', 'error'].forEach(method => {
+          ["log", "info", "warn", "error"].forEach((method) => {
             (console as any)[method] = (...args: any[]) => {
-              window.mcpHelper.logs.push(`[${method}] ${args.join(' ')}`);
+              window.mcpHelper.logs.push(`[${method}] ${args.join(" ")}`);
               (window.mcpHelper.originalConsole as any)[method](...args);
             };
-          } );
-        } );
+          });
+        });
 
-        const result = await page.evaluate( args.script );
+        const result = await page.evaluate(args.script);
 
         const logs = await page.evaluate(() => {
           Object.assign(console, window.mcpHelper.originalConsole);
           const logs = window.mcpHelper.logs;
-          delete ( window as any).mcpHelper;
+          delete (window as any).mcpHelper;
           return logs;
         });
 
@@ -301,27 +437,77 @@ async function handleToolCall(name: string, args: any): Promise<CallToolResult> 
           content: [
             {
               type: "text",
-              text: `Execution result:\n${JSON.stringify(result, null, 2)}\n\nConsole output:\n${logs.join('\n')}`,
+              text: `Execution result:\n${JSON.stringify(
+                result,
+                null,
+                2
+              )}\n\nConsole output:\n${logs.join("\n")}`,
             },
           ],
           isError: false,
         };
       } catch (error) {
         return {
-          content: [{
-            type: "text",
-            text: `Script execution failed: ${(error as Error).message}`,
-          }],
+          content: [
+            {
+              type: "text",
+              text: `Script execution failed: ${(error as Error).message}`,
+            },
+          ],
           isError: true,
         };
       }
 
+    case "page_history":
+      return {
+        content: [
+          {
+            type: "text",
+            text: urlHistory.reverse().join("\n"),
+          },
+        ],
+        isError: false,
+      };
+
+    case "get_page_requests": {
+      console.error(
+        "get_page_requests",
+        "arg url",
+        args.url,
+        "all_requests",
+        requests
+      );
+      const requestData = requests.get(args.url);
+      if (!requestData) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `No requests found for URL: ${args.url}`,
+            },
+          ],
+          isError: false,
+        };
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(requestData, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    }
+
     default:
       return {
-        content: [{
-          type: "text",
-          text: `Unknown tool: ${name}`,
-        }],
+        content: [
+          {
+            type: "text",
+            text: `Unknown tool: ${name}`,
+          },
+        ],
         isError: true,
       };
   }
@@ -337,9 +523,8 @@ const server = new Server(
       resources: {},
       tools: {},
     },
-  },
+  }
 );
-
 
 // Setup request handlers
 server.setRequestHandler(ListResourcesRequestSchema, async () => ({
@@ -349,7 +534,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
       mimeType: "text/plain",
       name: "Browser console logs",
     },
-    ...Array.from(screenshots.keys()).map(name => ({
+    ...Array.from(screenshots.keys()).map((name) => ({
       uri: `screenshot://${name}`,
       mimeType: "image/png",
       name: `Screenshot: ${name}`,
@@ -362,11 +547,13 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 
   if (uri === "console://logs") {
     return {
-      contents: [{
-        uri,
-        mimeType: "text/plain",
-        text: consoleLogs.join("\n"),
-      }],
+      contents: [
+        {
+          uri,
+          mimeType: "text/plain",
+          text: consoleLogs.join("\n"),
+        },
+      ],
     };
   }
 
@@ -375,11 +562,13 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     const screenshot = screenshots.get(name);
     if (screenshot) {
       return {
-        contents: [{
-          uri,
-          mimeType: "image/png",
-          blob: screenshot,
-        }],
+        contents: [
+          {
+            uri,
+            mimeType: "image/png",
+            blob: screenshot,
+          },
+        ],
       };
     }
   }
