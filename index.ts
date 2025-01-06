@@ -130,7 +130,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: "get_page_requests",
-    description: "Get all HTTP requests made for a specific URL",
+    description:
+      "Get all of the HTTP requests made for a specific URL, the most recent requests first",
     inputSchema: {
       type: "object",
       properties: {
@@ -185,7 +186,7 @@ async function ensureBrowser() {
 
     page.on("request", (request) => {
       if (requests.has(page.url())) {
-        requests.get(page.url()).push({
+        requests.get(page.url()).unshift({
           url: request.url(),
           resourceType: request.resourceType(),
           method: request.method(),
