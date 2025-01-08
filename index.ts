@@ -10,16 +10,12 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer, { Browser, Page } from "puppeteer";
 import {
-  getEmbedding,
   getEmbeddingSentTransformer,
   initializeModelSentTransformer,
   makeRequest,
-  semanticSearchRequests,
   semanticSearchRequestsSentTransformer,
 } from "./utilities.js";
-import * as use from "@tensorflow-models/universal-sentence-encoder";
-import "@tensorflow/tfjs-backend-webgl";
-import * as tf from "@tensorflow/tfjs";
+
 import { RequestRecord } from "./types.js";
 import { FeatureExtractionPipeline } from "@xenova/transformers";
 // Define the tools once to avoid repetition
@@ -113,32 +109,14 @@ let page: Page | undefined;
 const consoleLogs: string[] = [];
 const requests: Map<string, RequestRecord[]> = new Map(); // collects all results
 const urlHistory: Array<string> = [];
-let model: use.UniversalSentenceEncoder | undefined;
+
 let pipeline: FeatureExtractionPipeline | undefined;
-console.error("log model", model);
+
 initializeModelSentTransformer().then((sent_pipeline) => {
   console.error("model loaded");
   console.error("model", sent_pipeline);
   pipeline = sent_pipeline;
 });
-// ensureModel();
-async function doStuff() {
-  console.error("doStuff haha");
-  await use.load();
-  return;
-}
-// doStuff();
-async function ensureModel() {
-  console.error("ensureModel", model);
-  if (!model) {
-    await tf.setBackend("cpu");
-    await tf.ready();
-    console.error("loading model now");
-    model = await use.load();
-    console.error("model loaded");
-  }
-  return;
-}
 
 async function ensureBrowser() {
   if (!browser) {
@@ -188,15 +166,6 @@ async function ensureBrowser() {
             pipeline
           ),
         });
-        // server.sendLoggingMessage({
-        //   level: "info",
-        //   data: JSON.stringify({
-        //     resourceType: request.resourceType(),
-        //     method: request.method(),
-        //     headers: request.headers(),
-        //     postData: request.postData(),
-        //   }),
-        // });
         console.error("request", {
           url: request.url(),
           resourceType: request.resourceType(),
@@ -224,9 +193,6 @@ async function ensureBrowser() {
       }
       request.continue();
     });
-    // page.on("load", () => {
-    //   urlHistory.push(page.url());
-    // });
   }
   return page!;
 }
@@ -269,37 +235,6 @@ async function handleToolCall(
         ],
         isError: false,
       };
-
-    // case "get_page_requests": {
-    //   console.error(
-    //     "get_page_requests",
-    //     "arg url",
-    //     args.url,
-    //     "all_requests",
-    //     requests
-    //   );
-    //   const requestData = requests.get(args.url);
-    //   if (!requestData) {
-    //     return {
-    //       content: [
-    //         {
-    //           type: "text",
-    //           text: `No requests found for URL: ${args.url}`,
-    //         },
-    //       ],
-    //       isError: false,
-    //     };
-    //   }
-    //   return {
-    //     content: [
-    //       {
-    //         type: "text",
-    //         text: JSON.stringify(requestData, null, 2),
-    //       },
-    //     ],
-    //     isError: false,
-    //   };
-    // }
 
     case "make_http_request": {
       const response = await makeRequest(
