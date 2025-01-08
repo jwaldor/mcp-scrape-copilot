@@ -1,6 +1,3 @@
-import * as use from "@tensorflow-models/universal-sentence-encoder";
-import "@tensorflow/tfjs-backend-webgl";
-import * as tf from "@tensorflow/tfjs";
 import { RequestRecord } from "./types.js";
 import { FeatureExtractionPipeline } from "@xenova/transformers";
 
@@ -67,19 +64,6 @@ export async function getEmbeddingSentTransformer(
   return Array.from(embedding.data);
 }
 
-export async function getEmbedding(
-  text: string,
-  model: use.UniversalSentenceEncoder
-): Promise<number[]> {
-  // Generate embedding
-  // Generate embedding
-  const embeddings = await model.embed([text]);
-
-  // Convert the tensor to array and return the first (and only) embedding
-  const embeddingArray = await embeddings.array();
-  return embeddingArray[0];
-}
-
 // async function testGetEmbedding() {
 //   console.log("Loading model...");
 //   await tf.setBackend("cpu");
@@ -91,27 +75,6 @@ export async function getEmbedding(
 // }
 
 // testGetEmbedding();
-
-export async function semanticSearchRequests(
-  query: string,
-  requests: Array<RequestRecord>,
-  model: use.UniversalSentenceEncoder
-): Promise<Array<RequestRecord & { similarity: number }>> {
-  // Get embedding for the query
-  const queryEmbedding = await getEmbedding(query, model);
-
-  // Calculate cosine similarity scores for all requests
-  const scoredRequests = requests.map((request) => {
-    // Compute cosine similarity between query and request embeddings
-    const similarity = cosineSimilarity(queryEmbedding, request.embedding);
-    return { ...request, similarity };
-  });
-
-  // Sort by similarity score (highest first) and take top 10
-  return scoredRequests
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 10);
-}
 
 export async function semanticSearchRequestsSentTransformer(
   query: string,
