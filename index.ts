@@ -136,24 +136,9 @@ async function ensureBrowser() {
         request.continue();
         return;
       }
-      if (requests.has(page.url())) {
-        requests.get(page.url()).unshift({
-          url: request.url(),
-          resourceType: request.resourceType(),
-          method: request.method(),
-          headers: request.headers(),
-          postData: request.postData(),
-          embedding: await getEmbeddingSentTransformer(
-            request.url() +
-              request.method() +
-              JSON.stringify(request.headers()) +
-              JSON.stringify(request.postData()),
-            pipeline
-          ),
-        });
-      } else {
-        requests.set(page.url(), [
-          {
+      const add_request = async () => {
+        if (requests.has(page.url())) {
+          requests.get(page.url()).unshift({
             url: request.url(),
             resourceType: request.resourceType(),
             method: request.method(),
@@ -166,9 +151,27 @@ async function ensureBrowser() {
                 JSON.stringify(request.postData()),
               pipeline
             ),
-          },
-        ]);
-      }
+          });
+        } else {
+          requests.set(page.url(), [
+            {
+              url: request.url(),
+              resourceType: request.resourceType(),
+              method: request.method(),
+              headers: request.headers(),
+              postData: request.postData(),
+              embedding: await getEmbeddingSentTransformer(
+                request.url() +
+                  request.method() +
+                  JSON.stringify(request.headers()) +
+                  JSON.stringify(request.postData()),
+                pipeline
+              ),
+            },
+          ]);
+        }
+      };
+      add_request();
       request.continue();
     });
   }
