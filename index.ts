@@ -106,13 +106,7 @@ initializeModelSentTransformer().then((sent_pipeline) => {
 async function ensureBrowser() {
   if (!browser) {
     const npx_args = { headless: false };
-    const docker_args = {
-      headless: true,
-      args: ["--no-sandbox", "--single-process", "--no-zygote"],
-    };
-    browser = await puppeteer.launch(
-      process.env.DOCKER_CONTAINER ? docker_args : npx_args
-    );
+    browser = await puppeteer.launch(npx_args);
     const pages = await browser.pages();
     page = pages[0];
     page.setRequestInterception(true);
