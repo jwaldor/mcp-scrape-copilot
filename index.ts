@@ -40,21 +40,6 @@ const TOOLS: Tool[] = [
       required: [],
     },
   },
-  // {
-  //   name: "get_page_requests",
-  //   description:
-  //     "Get all of the HTTP requests made for a specific URL, the most recent requests first",
-  //   inputSchema: {
-  //     type: "object",
-  //     properties: {
-  //       url: {
-  //         type: "string",
-  //         description: "The URL to get requests for",
-  //       },
-  //     },
-  //     required: ["url"],
-  //   },
-  // },
   {
     name: "make_http_request",
     description: "Make an HTTP request with curl",
