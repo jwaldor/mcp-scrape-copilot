@@ -9,10 +9,15 @@ import {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import puppeteer, { Browser, Page } from "puppeteer";
-import { makeRequest } from "./utilities.js";
-import * as use from "@tensorflow-models/universal-sentence-encoder";
-import "@tensorflow/tfjs-backend-webgl";
-import * as tf from "@tensorflow/tfjs";
+import {
+  getEmbeddingSentTransformer,
+  initializeModelSentTransformer,
+  makeRequest,
+  semanticSearchRequestsSentTransformer,
+} from "./utilities.js";
+
+import { RequestRecord } from "./types.js";
+import { FeatureExtractionPipeline } from "@xenova/transformers";
 // Define the tools once to avoid repetition
 const TOOLS: Tool[] = [
   {
@@ -33,21 +38,6 @@ const TOOLS: Tool[] = [
       type: "object",
       properties: {},
       required: [],
-    },
-  },
-  {
-    name: "get_page_requests",
-    description:
-      "Get all of the HTTP requests made for a specific URL, the most recent requests first",
-    inputSchema: {
-      type: "object",
-      properties: {
-        url: {
-          type: "string",
-          description: "The URL to get requests for",
-        },
-      },
-      required: ["url"],
     },
   },
   {
@@ -76,23 +66,42 @@ const TOOLS: Tool[] = [
       required: ["type", "url", "headers", "body"],
     },
   },
+  {
+    name: "semantic_search_requests",
+    description:
+      "Semantically search for requests that occurred within a page URL. Returns the top 10 results.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Your search request. Make this specific and detailed to get the best results",
+        },
+        page_url: {
+          type: "string",
+          description: "The page within which to search for requests",
+        },
+      },
+      required: ["query", "page_url"],
+    },
+  },
 ];
 
 // Global state
 let browser: Browser | undefined;
 let page: Page | undefined;
 const consoleLogs: string[] = [];
-const requests: Map<
-  string,
-  {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    resourceType: string;
-    postData: any;
-  }[]
-> = new Map(); // collects all results
+const requests: Map<string, RequestRecord[]> = new Map(); // collects all results
 const urlHistory: Array<string> = [];
+
+let pipeline: FeatureExtractionPipeline | undefined;
+
+initializeModelSentTransformer().then((sent_pipeline) => {
+  console.error("model loaded");
+  console.error("model", sent_pipeline);
+  pipeline = sent_pipeline;
+});
 
 async function ensureBrowser() {
   if (!browser) {
@@ -117,7 +126,16 @@ async function ensureBrowser() {
       });
     });
 
-    page.on("request", (request) => {
+    page.on("request", async (request) => {
+      if (!pipeline) {
+        console.error(
+          "Request made before model was loaded.",
+          request.url(),
+          page.url()
+        );
+        request.continue();
+        return;
+      }
       if (requests.has(page.url())) {
         requests.get(page.url()).unshift({
           url: request.url(),
@@ -125,22 +143,13 @@ async function ensureBrowser() {
           method: request.method(),
           headers: request.headers(),
           postData: request.postData(),
-        });
-        // server.sendLoggingMessage({
-        //   level: "info",
-        //   data: JSON.stringify({
-        //     resourceType: request.resourceType(),
-        //     method: request.method(),
-        //     headers: request.headers(),
-        //     postData: request.postData(),
-        //   }),
-        // });
-        console.error("request", {
-          url: request.url(),
-          resourceType: request.resourceType(),
-          method: request.method(),
-          headers: request.headers(),
-          postData: request.postData(),
+          embedding: await getEmbeddingSentTransformer(
+            request.url() +
+              request.method() +
+              JSON.stringify(request.headers()) +
+              JSON.stringify(request.postData()),
+            pipeline
+          ),
         });
       } else {
         requests.set(page.url(), [
@@ -150,26 +159,20 @@ async function ensureBrowser() {
             method: request.method(),
             headers: request.headers(),
             postData: request.postData(),
+            embedding: await getEmbeddingSentTransformer(
+              request.url() +
+                request.method() +
+                JSON.stringify(request.headers()) +
+                JSON.stringify(request.postData()),
+              pipeline
+            ),
           },
         ]);
       }
       request.continue();
     });
-    page.on("load", () => {
-      urlHistory.push(page.url());
-    });
   }
   return page!;
-}
-
-let model: use.UniversalSentenceEncoder | undefined;
-async function ensureModel() {
-  if (!model) {
-    await tf.setBackend("cpu");
-    await tf.ready();
-    const model = await use.load();
-  }
-  return model;
 }
 
 declare global {
@@ -186,7 +189,6 @@ async function handleToolCall(
   args: any
 ): Promise<CallToolResult> {
   const page = await ensureBrowser();
-  const model = await ensureModel();
   switch (name) {
     case "puppeteer_navigate":
       await page.goto(args.url);
@@ -211,37 +213,6 @@ async function handleToolCall(
         isError: false,
       };
 
-    case "get_page_requests": {
-      console.error(
-        "get_page_requests",
-        "arg url",
-        args.url,
-        "all_requests",
-        requests
-      );
-      const requestData = requests.get(args.url);
-      if (!requestData) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `No requests found for URL: ${args.url}`,
-            },
-          ],
-          isError: false,
-        };
-      }
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(requestData, null, 2),
-          },
-        ],
-        isError: false,
-      };
-    }
-
     case "make_http_request": {
       const response = await makeRequest(
         args.url,
@@ -251,6 +222,29 @@ async function handleToolCall(
       );
       return {
         content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
+        isError: false,
+      };
+    }
+
+    case "semantic_search_requests": {
+      if (!pipeline) {
+        return {
+          content: [{ type: "text", text: "Model not defined" }],
+          isError: true,
+        };
+      }
+      const searchResults = await semanticSearchRequestsSentTransformer(
+        args.query,
+        requests.get(args.page_url),
+        pipeline
+      );
+      const withoutEmbedding = searchResults.map(
+        ({ embedding, similarity, ...rest }) => rest
+      );
+      return {
+        content: [
+          { type: "text", text: JSON.stringify(withoutEmbedding, null, 2) },
+        ],
         isError: false,
       };
     }
