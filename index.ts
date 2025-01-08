@@ -76,7 +76,7 @@ const TOOLS: Tool[] = [
         query: {
           type: "string",
           description:
-            "Your search request. Make this specific and detailed to get the best results",
+            "Your search request, which should consist of a bunch of specific keywords for best results.",
         },
         page_url: {
           type: "string",
