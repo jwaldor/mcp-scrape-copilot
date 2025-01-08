@@ -151,13 +151,6 @@ async function ensureBrowser() {
             pipeline
           ),
         });
-        console.error("request", {
-          url: request.url(),
-          resourceType: request.resourceType(),
-          method: request.method(),
-          headers: request.headers(),
-          postData: request.postData(),
-        });
       } else {
         requests.set(page.url(), [
           {
@@ -196,7 +189,6 @@ async function handleToolCall(
   args: any
 ): Promise<CallToolResult> {
   const page = await ensureBrowser();
-  // const model = await ensureModel();
   switch (name) {
     case "puppeteer_navigate":
       await page.goto(args.url);
