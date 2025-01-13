@@ -18,6 +18,8 @@ import {
 
 import { RequestRecord } from "./types.js";
 import { FeatureExtractionPipeline } from "@xenova/transformers";
+import { Command } from "commander";
+import { getConfigCommand } from "./config.js";
 // Define the tools once to avoid repetition
 const TOOLS: Tool[] = [
   {
@@ -82,8 +84,16 @@ const TOOLS: Tool[] = [
           type: "string",
           description: "The page within which to search for requests",
         },
+        exact_substrings: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+          description:
+            "An array of strings that must be exactly present in the request URL, body, or headers to be included in the results (not case sensitive). The array can be empty, in which case no requests are filtered out in this way.",
+        },
       },
-      required: ["query", "page_url"],
+      required: ["query", "page_url", "exact_substrings"],
     },
   },
 ];
@@ -230,9 +240,24 @@ async function handleToolCall(
           isError: true,
         };
       }
+      const filtered_requests: Array<RequestRecord> = requests
+        .get(args.page_url)
+        .filter((request) => {
+          return args.exact_substrings.every(
+            (substring) =>
+              request.url.toLowerCase().includes(substring.toLowerCase()) ||
+              (request.postData &&
+                JSON.stringify(request.postData)
+                  .toLowerCase()
+                  .includes(substring.toLowerCase())) ||
+              JSON.stringify(request.headers)
+                .toLowerCase()
+                .includes(substring.toLowerCase())
+          );
+        });
       const searchResults = await semanticSearchRequestsSentTransformer(
         args.query,
-        requests.get(args.page_url),
+        filtered_requests,
         pipeline
       );
       const withoutEmbedding = searchResults.map(
@@ -285,9 +310,32 @@ async function runServer() {
   await server.connect(transport);
 }
 
-runServer().catch(console.error);
-
 process.stdin.on("close", () => {
   console.error("Puppeteer MCP Server closed");
   server.close();
 });
+
+async function main() {
+  runServer().catch((error) => {
+    console.error("Server error:", error);
+    process.exit(1);
+  });
+}
+
+export function createServer() {
+  return new Command("serve").action(() => {
+    main().catch((error) => {
+      console.error("Server error:", error);
+      process.exit(1);
+    });
+  });
+}
+
+const program = new Command();
+program
+  .name("mcp-scrape-copilot")
+  .version("0.0.1")
+  .description("MCP server for supercharging API reverse engineering");
+program.addCommand(createServer());
+program.addCommand(getConfigCommand());
+program.parse(process.argv);

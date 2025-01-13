@@ -64,18 +64,6 @@ export async function getEmbeddingSentTransformer(
   return Array.from(embedding.data);
 }
 
-// async function testGetEmbedding() {
-//   console.log("Loading model...");
-//   await tf.setBackend("cpu");
-//   await tf.ready();
-//   const model = await use.load();
-//   console.log("Model loaded");
-//   const embedding = await getEmbedding("Hello, world!", model);
-//   console.log(embedding);
-// }
-
-// testGetEmbedding();
-
 export async function semanticSearchRequestsSentTransformer(
   query: string,
   requests: Array<RequestRecord>,
