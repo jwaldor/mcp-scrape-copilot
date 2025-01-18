@@ -2,6 +2,8 @@
 
 A Model Context Protocol server that provides browser automation capabilities using Puppeteer. This server enables LLMs to interact with web pages, take screenshots, and execute JavaScript in a real browser environment.
 
+<a href="https://glama.ai/mcp/servers/anvpl8ffa6"><img width="380" height="200" src="https://glama.ai/mcp/servers/anvpl8ffa6/badge" alt="Puppeteer Server MCP server" /></a>
+
 ## Components
 
 ### Tools
